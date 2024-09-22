@@ -26,6 +26,41 @@ module Node #(parameter NODEID = 0) (
   input  logic       put_inbound,      // Router is transferring to node
   input  logic [7:0] payload_inbound); // Data sent from router to node
 
+  logic takeFromBuf, emptyQueue;
+  logic [31:0] dataReadToReg;
+  logic [31:0] regOutToRouter;
+  logic [31:0] regOutToTB;
+  
+
+  // Queue structure to store packets
+  FIFO buffer(.clock, .reset_n, .data_in(pkt_in), .we(pkt_in_avail), 
+              .re(takeFromBuf), .data_out(dataReadToReg), .full(cQ_full), 
+              .empty(emptyQueue));
+
+  assign takeFromBuf = (emptyQueue) ? 0 : 1;
+  
+  // Shift register for Node to Router
+  always_ff @(posedge clock) begin
+    if (~reset_n)
+      regOutToRouter <= '0;
+    // else if (takeFromBuf && dataValid > 4)
+    //   regOutToRouter <= dataReadToReg;
+    //   dataValid <= '0;
+    // else if (dataValid < 4)
+    //   regOutToRouter <= regOutToRouter >> 8;
+    //   dataValid <= dataValid + 1;
+
+  end
+
+  // Shift register for Router to TB
+  always_ff @(posedge clock) begin
+    if (~reset_n)
+      regOutToTB <= '0;
+    else if ()
+    
+
+  end
+
 endmodule : Node
 
 /*
@@ -45,5 +80,37 @@ module FIFO #(parameter WIDTH=32) (
     output logic [WIDTH-1:0] data_out,
     output logic             full, empty);
 
+    logic [WIDTH-1:0][3:0] Q;
+    logic [1:0] getPtr, putPtr;
+    logic [2:0] lengthQ;
 
+    always_comb begin
+      empty = (lengthQ == 0);
+      full = (lengthQ == 3'd4);
+    end
+
+    always_ff @(posedge clock) begin
+      if (~reset_n) begin
+        getPtr <= '0;
+        putPtr <= '0;
+        lengthQ <= '0;
+        Q <= '0;
+      end
+      else if ((we && ~re && ~full) || (we && re && ~full && empty)) begin
+        Q[putPtr] <= data_in;
+        putPtr <= putPtr + 1;
+        lengthQ <= lengthQ + 1;
+      end
+      else if ((~we && re && ~empty) || (we && re && full && ~empty)) begin
+        data_out <= Q[getPtr];
+        getPtr <= getPtr + 1;
+        lengthQ <= lengthQ - 1;
+      end
+      else if (we && re && ~full && ~empty) begin
+        Q[putPtr] <= data_in;
+        data_out <= Q[getPtr];
+        putPtr <= putPtr + 1;
+        getPtr <= getPtr + 1;
+      end
+    end
 endmodule : FIFO
