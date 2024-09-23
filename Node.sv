@@ -29,8 +29,8 @@ module Node #(parameter NODEID = 0) (
   logic takeFromBuf, emptyQueue;
   logic [31:0] dataReadToReg;
   pkt_t regOutToRouter;
-  pkt_t regOutToTB;
-  logic [2:0] dataValid;
+  logic [2:0] dataValidOut, dataValidIn;
+  logic [5:0] positionIn;
   
 
   // Queue structure to store packets
@@ -42,29 +42,65 @@ module Node #(parameter NODEID = 0) (
   
   // Shift register for Node to Router
   always_ff @(posedge clock) begin
-    if (~reset_n)
+    if (~reset_n) begin
       regOutToRouter <= '0;
-    else if (takeFromBuf && dataValid == 0)
-      /* CHECK COMBINATIONAL READ FROM QUEUE CURRENTLY THE QUEUE HAS THE READ
-      OUTPUT AVAILABLE ON THE NEXT CLOCK CYCLE */
+      dataValidOut <= '0;
+      put_outbound <= 0;
+    end
+    else if (takeFromBuf && dataValidOut == 0) begin
       regOutToRouter <= dataReadToReg;
-    else if (dataValid == 1)
+      dataValidOut <= dataValidOut + 1;
+      put_outbound <= 0;
+    end
+    else if (free_outbound && dataValidOut == 1) begin
       payload_outbound <= {regOutToRouter.src, regOutToRouter.desc};
-    else if (dataValid == 2)
+      dataValidOut <= dataValidOut + 1;
+      put_outbound <= 1;
+    end
+    else if (dataValidOut == 2) begin
       payload_outbound <= regOutToRouter.data[23:16];
-    else if (dataValid == 3)
+      dataValidOut <= dataValidOut + 1;
+      put_outbound <= 1;
+    end
+    else if (dataValidOut == 3) begin
       payload_outbound <= regOutToRouter.data[15:8];
-    else if (dataValid == 4)
+      dataValidOut <= dataValidOut + 1;
+      put_outbound <= 1;
+    end
+    else if (dataValidOut == 4) begin
       payload_outbound <= regOutToRouter.data[7:0];
-      dataValid <= '0;
-
+      dataValidOut <= '0;
+      put_outbound <= 1;
+    end
+    else
+      put_outbound <= 0;
   end
 
   // Shift register for Router to TB
   always_ff @(posedge clock) begin
-    if (~reset_n)
-      regOutToTB <= '0;
-    else if ()
+    if (~reset_n) begin
+      pkt_out <= '0;
+      positionIn <= 24;
+      free_inbound <= 0;
+      dataValidIn <= '0;
+      pkt_out_avail <= 0;;
+    end
+    else if (put_inbound) begin
+      pkt_out <= (pkt_out | payload_inbound) << positionIn;
+      positionIn <= positionIn - 8;
+      free_inbound <= 0;
+      dataValidIn <= dataValidIn + 1;
+      pkt_out_avail <= 0;
+    end
+    else if (~put_inbound && dataValidIn == 4) begin
+      pkt_out_avail <= 1;
+      dataValidIn <= '0;
+      free_inbound <= 0;
+    end
+    else
+      free_inbound <= 1;
+      pkt_out_avail <= 0;
+      positionIn <= 24;
     
 
   end
@@ -95,6 +131,7 @@ module FIFO #(parameter WIDTH=32) (
     always_comb begin
       empty = (lengthQ == 0);
       full = (lengthQ == 3'd4);
+
       if ((~we && re && ~empty) || (we && re && full && ~empty) || 
           (we && re && ~full && ~empty)) 
         data_out = Q[getPtr];
