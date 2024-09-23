@@ -28,8 +28,9 @@ module Node #(parameter NODEID = 0) (
 
   logic takeFromBuf, emptyQueue;
   logic [31:0] dataReadToReg;
-  logic [31:0] regOutToRouter;
-  logic [31:0] regOutToTB;
+  pkt_t regOutToRouter;
+  pkt_t regOutToTB;
+  logic [2:0] dataValid;
   
 
   // Queue structure to store packets
@@ -43,12 +44,19 @@ module Node #(parameter NODEID = 0) (
   always_ff @(posedge clock) begin
     if (~reset_n)
       regOutToRouter <= '0;
-    // else if (takeFromBuf && dataValid > 4)
-    //   regOutToRouter <= dataReadToReg;
-    //   dataValid <= '0;
-    // else if (dataValid < 4)
-    //   regOutToRouter <= regOutToRouter >> 8;
-    //   dataValid <= dataValid + 1;
+    else if (takeFromBuf && dataValid == 0)
+      /* CHECK COMBINATIONAL READ FROM QUEUE CURRENTLY THE QUEUE HAS THE READ
+      OUTPUT AVAILABLE ON THE NEXT CLOCK CYCLE */
+      regOutToRouter <= dataReadToReg;
+    else if (dataValid == 1)
+      payload_outbound <= {regOutToRouter.src, regOutToRouter.desc};
+    else if (dataValid == 2)
+      payload_outbound <= regOutToRouter.data[23:16];
+    else if (dataValid == 3)
+      payload_outbound <= regOutToRouter.data[15:8];
+    else if (dataValid == 4)
+      payload_outbound <= regOutToRouter.data[7:0];
+      dataValid <= '0;
 
   end
 
@@ -87,6 +95,10 @@ module FIFO #(parameter WIDTH=32) (
     always_comb begin
       empty = (lengthQ == 0);
       full = (lengthQ == 3'd4);
+      if ((~we && re && ~empty) || (we && re && full && ~empty) || 
+          (we && re && ~full && ~empty)) 
+        data_out = Q[getPtr];
+
     end
 
     always_ff @(posedge clock) begin
@@ -102,13 +114,11 @@ module FIFO #(parameter WIDTH=32) (
         lengthQ <= lengthQ + 1;
       end
       else if ((~we && re && ~empty) || (we && re && full && ~empty)) begin
-        data_out <= Q[getPtr];
         getPtr <= getPtr + 1;
         lengthQ <= lengthQ - 1;
       end
       else if (we && re && ~full && ~empty) begin
         Q[putPtr] <= data_in;
-        data_out <= Q[getPtr];
         putPtr <= putPtr + 1;
         getPtr <= getPtr + 1;
       end
