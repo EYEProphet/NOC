@@ -81,12 +81,12 @@ module Node #(parameter NODEID = 0) (
     if (~reset_n) begin
       pkt_out <= '0;
       positionIn <= 24;
-      free_inbound <= 0;
+      free_inbound <= 1;
       dataValidIn <= '0;
       pkt_out_avail <= 0;;
     end
     else if (put_inbound) begin
-      pkt_out <= (pkt_out | payload_inbound) << positionIn;
+      pkt_out <= pkt_out | (payload_inbound << positionIn);
       positionIn <= positionIn - 8;
       free_inbound <= 0;
       dataValidIn <= dataValidIn + 1;
@@ -101,6 +101,7 @@ module Node #(parameter NODEID = 0) (
       free_inbound <= 1;
       pkt_out_avail <= 0;
       positionIn <= 24;
+      pkt_out <= '0;
     end
     
   end
