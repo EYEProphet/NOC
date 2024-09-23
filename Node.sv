@@ -38,7 +38,7 @@ module Node #(parameter NODEID = 0) (
               .re(takeFromBuf), .data_out(dataReadToReg), .full(cQ_full), 
               .empty(emptyQueue));
 
-  assign takeFromBuf = (emptyQueue) ? 0 : 1;
+  assign takeFromBuf = (~emptyQueue & dataValidOut == 0) ? 1 : 0;
   
   // Shift register for Node to Router
   always_ff @(posedge clock) begin
@@ -47,13 +47,13 @@ module Node #(parameter NODEID = 0) (
       dataValidOut <= '0;
       put_outbound <= 0;
     end
-    else if (takeFromBuf && dataValidOut == 0) begin
+    else if (takeFromBuf) begin
       regOutToRouter <= dataReadToReg;
       dataValidOut <= dataValidOut + 1;
       put_outbound <= 0;
     end
     else if (free_outbound && dataValidOut == 1) begin
-      payload_outbound <= {regOutToRouter.src, regOutToRouter.desc};
+      payload_outbound <= {regOutToRouter.src, regOutToRouter.dest};
       dataValidOut <= dataValidOut + 1;
       put_outbound <= 1;
     end
@@ -97,12 +97,12 @@ module Node #(parameter NODEID = 0) (
       dataValidIn <= '0;
       free_inbound <= 0;
     end
-    else
+    else begin
       free_inbound <= 1;
       pkt_out_avail <= 0;
       positionIn <= 24;
+    end
     
-
   end
 
 endmodule : Node
@@ -124,7 +124,7 @@ module FIFO #(parameter WIDTH=32) (
     output logic [WIDTH-1:0] data_out,
     output logic             full, empty);
 
-    logic [WIDTH-1:0][3:0] Q;
+    logic [3:0][WIDTH-1:0] Q;
     logic [1:0] getPtr, putPtr;
     logic [2:0] lengthQ;
 
