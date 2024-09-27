@@ -133,8 +133,7 @@ module FIFO #(parameter WIDTH=32) (
       empty = (lengthQ == 0);
       full = (lengthQ == 3'd4);
 
-      if ((~we && re && ~empty) || (we && re && full && ~empty) || 
-          (we && re && ~full && ~empty)) 
+      if (re & ~empty) 
         data_out = Q[getPtr];
 
     end
