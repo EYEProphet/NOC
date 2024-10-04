@@ -41,7 +41,7 @@ module Node #(parameter NODEID = 0) (
   assign takeFromBuf = (~emptyQueue & dataValidOut == 0) ? 1 : 0;
   
   // Shift register for Node to Router
-  always_ff @(posedge clock) begin
+  always_ff @(posedge clock, negedge reset_n) begin
     if (~reset_n) begin
       regOutToRouter <= '0;
       dataValidOut <= '0;
@@ -77,13 +77,13 @@ module Node #(parameter NODEID = 0) (
   end
 
   // Shift register for Router to TB
-  always_ff @(posedge clock) begin
+  always_ff @(posedge clock, negedge reset_n) begin
     if (~reset_n) begin
       pkt_out <= '0;
       positionIn <= 24;
       free_inbound <= 1;
       dataValidIn <= '0;
-      pkt_out_avail <= 0;;
+      pkt_out_avail <= 0;
     end
     else if (put_inbound) begin
       pkt_out <= pkt_out | (payload_inbound << positionIn);
@@ -138,7 +138,7 @@ module FIFO #(parameter WIDTH=32) (
 
     end
 
-    always_ff @(posedge clock) begin
+    always_ff @(posedge clock, negedge reset_n) begin
       if (~reset_n) begin
         getPtr <= '0;
         putPtr <= '0;
