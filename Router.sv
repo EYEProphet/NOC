@@ -38,7 +38,7 @@ module Router #(parameter ROUTERID = 0) (
         assign wrToQ[inReg] = (~put_inbound[inReg] && doneIn[inReg] && 
                                ~fullQueue[inReg]) ? 1 : 0;
         
-        assign reFromQ[inReg] = (~emptyQueue[inReg] && regFull[inReg]) ? 1 : 0;
+        assign reFromQ[inReg] = (~emptyQueue[inReg] && ~regFull[inReg]) ? 1 : 0;
 
         // Creates input buffers for router nodes
         always_ff @(posedge clock, negedge reset_n) begin
@@ -111,16 +111,17 @@ module Router #(parameter ROUTERID = 0) (
                                   .newDest(convertedDest[outReg]));
 
         always_comb begin
-          if (leastUsed[outReg][0] == 0)
-            startNode[outReg] = outReg + 2'd1;
-          else if (leastUsed[outReg][1] == 0)
-            startNode[outReg] = outReg + 2'd2;
-          else if (leastUsed[outReg][2] == 0)
-            startNode[outReg] = outReg + 2'd3;
-          else begin
-            startNode[outReg] = outReg + 2'd1;
-          end
-
+          // if (leastUsed[outReg][0] == 0)
+          //   startNode[outReg] = outReg + 2'd1;
+          // else if (leastUsed[outReg][1] == 0)
+          //   startNode[outReg] = outReg + 2'd2;
+          // else if (leastUsed[outReg][2] == 0)
+          //   startNode[outReg] = outReg + 2'd3;
+          // else begin
+          //   startNode[outReg] = outReg + 2'd1;
+          // end
+          
+          startNode[outReg] = outReg + 2'd1;
           checkEqual0[outReg] = convertedDest[startNode[outReg]] == outReg;
           checkEqual1[outReg] = (convertedDest[(startNode[outReg] + 2'd1)] == 
                                   outReg);
@@ -148,11 +149,12 @@ module Router #(parameter ROUTERID = 0) (
             previousNode[outReg] <= 0;
             dataValidOut[outReg] <= 0;
             put_outbound[outReg] <= 0;
+            leastUsed[outReg] <= '0;
           end
           else if (loadOut[outReg]) begin
             regOutToNode[outReg] <= pktHolder[tookNode[outReg]];
             took[outReg][tookNode[outReg]] <= 1;
-            leastUsed[outReg][(2'd3-outReg)+tookNode[outReg]] <= 1;
+            leastUsed[outReg][(((2'd3-outReg)+tookNode[outReg]) % 4)] <= 1;
             previousNode[outReg] <= tookNode[outReg];
             dataValidOut[outReg] <= dataValidOut[outReg] + 1;
             put_outbound[outReg] <= 0;
@@ -227,17 +229,17 @@ module biggerFIFO #(parameter WIDTH=32) (
       end
       else if ((we && ~re && ~full) || (we && re && ~full && empty)) begin
         Q[putPtr] <= data_in;
-        putPtr <= putPtr + 1;
+        putPtr <= (putPtr == 3'd6) ? 3'd0 : putPtr + 1;
         lengthQ <= lengthQ + 1;
       end
       else if ((~we && re && ~empty) || (we && re && full && ~empty)) begin
-        getPtr <= getPtr + 1;
+        getPtr <= (getPtr == 3'd6) ? 3'd0 : getPtr + 1;
         lengthQ <= lengthQ - 1;
       end
       else if (we && re && ~full && ~empty) begin
         Q[putPtr] <= data_in;
-        putPtr <= putPtr + 1;
-        getPtr <= getPtr + 1;
+        putPtr <= (putPtr == 3'd6) ? 3'd0 : putPtr + 1;
+        getPtr <= (getPtr == 3'd6) ? 3'd0 : getPtr + 1;
       end
     end
 endmodule : biggerFIFO
